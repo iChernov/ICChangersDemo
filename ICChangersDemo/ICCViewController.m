@@ -18,17 +18,19 @@ static NSString * const kLastYearFootprintKey = @"indexPrevYear";
 
 
 @interface ICCViewController ()
-@property IBOutlet UIView *contentView;
-@property IBOutlet UIScrollView *scrollView;
+@property (nonatomic, weak) IBOutlet UIView *contentView;
+@property (nonatomic, weak) IBOutlet UIScrollView *scrollView;
 
-@property IBOutlet UILabel *pastDaysFootprintLabel;
-@property IBOutlet UILabel *mainFootprintLabel;
-@property IBOutlet UILabel *kilometerLabel;
-@property IBOutlet UILabel *emissionLabel;
+@property (nonatomic, weak) IBOutlet UILabel *pastDaysFootprintLabel;
+@property (nonatomic, weak) IBOutlet UILabel *mainFootprintLabel;
+@property (nonatomic, weak) IBOutlet UILabel *kilometerLabel;
+@property (nonatomic, weak) IBOutlet UILabel *emissionLabel;
 
-@property IBOutlet UIImageView *arrowView;
-@property IBOutlet UIImageView *redRotatingBallView;
-@property IBOutlet UIImageView *redRotatingPointerView;
+@property (nonatomic, strong) NSDate *startDate;
+
+@property (nonatomic, weak) IBOutlet UIImageView *arrowView;
+@property (nonatomic, weak) IBOutlet UIImageView *redRotatingBallView;
+@property (nonatomic, weak) IBOutlet UIImageView *redRotatingPointerView;
 @end
 
 @implementation ICCViewController
@@ -54,6 +56,7 @@ static NSString * const kLastYearFootprintKey = @"indexPrevYear";
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    _startDate = [NSDate date];
     [self loadData];
 }
 
@@ -66,8 +69,6 @@ static NSString * const kLastYearFootprintKey = @"indexPrevYear";
                         methodParameterString,
                         apiKeyParameterString,
                         usernameParameterString];
-    NSLog(@"%@", string);
-
     NSURL *url = [NSURL URLWithString:string];
     NSURLRequest *request = [NSURLRequest requestWithURL:url];
     
@@ -76,10 +77,23 @@ static NSString * const kLastYearFootprintKey = @"indexPrevYear";
     
     __weak __typeof(self)weakSelf = self;
     [operation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
+        NSLog(@"%@", responseObject);
         if ([responseObject[@"status"] intValue] != 0) {
             [weakSelf shownUnknownErrorAlert];
-        } else {
+            return;
+        }
+        if (![responseObject[@"result"] respondsToSelector:@selector(allKeys)]) {
+            [weakSelf shownUnknownErrorAlert];
+            return;
+        }
+        NSTimeInterval timeInterval = [[NSDate date] timeIntervalSinceDate:weakSelf.startDate];
+        if(timeInterval >= 3.0) {
             [weakSelf processResponseDictionary:responseObject[@"result"]];
+        } else {
+            dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (3.0 - timeInterval) * NSEC_PER_SEC);
+            dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                [weakSelf processResponseDictionary:responseObject[@"result"]];
+            });
         }
     } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
         UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:@"Connection error"
@@ -93,9 +107,79 @@ static NSString * const kLastYearFootprintKey = @"indexPrevYear";
 }
 
 - (void)processResponseDictionary:(NSDictionary *)responseDict {
-
+    double currentFootprint = [responseDict[kMainFootPrintKey] doubleValue];
+    double lastMonthFootprint = [responseDict[kLastMonthFootPrintKey] doubleValue];
+    double lastYearFootprint = [responseDict[kLastYearFootprintKey] doubleValue];
+    
+    _mainFootprintLabel.text = [NSString stringWithFormat:@"%.2f", currentFootprint];
+    _emissionLabel.text = responseDict[kCO2EmissionKey];
+    
+    [self drawArrowWithDelta:(currentFootprint - lastMonthFootprint)];
+    [self rotateView:_redRotatingPointerView withFootprintValue:currentFootprint];
+    [self rotateView:_redRotatingBallView withFootprintValue:lastYearFootprint];
+    
+    //IT WAS NOT MENTIONED - WHERE TO GET THIS DATA, SO I USED SOME RANDOM VALUES
+    _pastDaysFootprintLabel.text = @"FOR THE LAST MONTH";
+    _kilometerLabel.text = responseDict[@"co2avoidedTotal"];
 }
 
+- (void)rotateView:(UIView *)viewToRotate withFootprintValue:(double)footstepValue {
+    if (footstepValue >= 9.5) {
+        [self bumpView:viewToRotate];
+        return;
+    }
+    if (footstepValue > 0) {
+        [UIView animateWithDuration:0.5f
+                         animations:^{
+                             viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - M_PI*footstepValue/10);}];
+    } else if (footstepValue == 0) {
+        [UIView animateWithDuration:0.5f
+                         animations:^{
+                             viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - 0.01);}];
+    } else {
+        [UIView animateWithDuration:0.3
+                              delay:0.0
+                            options:UIViewAnimationOptionCurveEaseIn
+                         animations:^{
+                             viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - 0.01);
+                         }
+                         completion:^(BOOL finished) {
+                             [UIView animateWithDuration:0.3
+                                                   delay:0.0
+                                                 options:UIViewAnimationOptionCurveEaseOut
+                                              animations:^{
+                                                  viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - M_PI*footstepValue/10);
+                                              }
+                                              completion:^(BOOL finished) {
+                                                
+                                              }
+                              ];
+                         }
+         ];
+    }
+    
+}
+
+- (void)bumpView:(UIView *)viewToRotate {
+    [UIView animateWithDuration:0.5
+                          delay:0.0
+                        options:UIViewAnimationOptionAutoreverse
+                     animations:^{
+                         viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI*0.2);
+                     }
+                     completion:^(BOOL finished) {
+                         viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(0);
+                     }
+     ];
+}
+
+- (void)drawArrowWithDelta:(int)delta {
+    if (delta >=0) {
+        _arrowView.image = [UIImage imageNamed:@"ARROW_GREEN_45X56"];
+    } else {
+        _arrowView.image = [UIImage imageNamed:@"ARROW_RED_45X56"];
+    }
+}
 
 - (void)shownUnknownErrorAlert {
     UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:@"Unknown error"
