@@ -132,43 +132,53 @@ static NSString * const kLastYearFootprintKey = @"indexPrevYear";
         [UIView animateWithDuration:0.5f
                          animations:^{
                              viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - M_PI*footstepValue/10);}];
-    } else if (footstepValue == 0) {
+        return;
+    }
+    if (footstepValue == 0) {
         [UIView animateWithDuration:0.5f
                          animations:^{
                              viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - 0.01);}];
-    } else {
-        [UIView animateWithDuration:0.3
-                              delay:0.0
-                            options:UIViewAnimationOptionCurveEaseIn
-                         animations:^{
-                             viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - 0.01);
-                         }
-                         completion:^(BOOL finished) {
-                             [UIView animateWithDuration:0.3
-                                                   delay:0.0
-                                                 options:UIViewAnimationOptionCurveEaseOut
-                                              animations:^{
-                                                  viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - M_PI*footstepValue/10);
-                                              }
-                                              completion:^(BOOL finished) {
-                                                
-                                              }
-                              ];
-                         }
-         ];
+        return;
     }
-    
+    [UIView animateWithDuration:0.3
+                          delay:0.0
+                        options:UIViewAnimationOptionCurveEaseIn
+                     animations:^{
+                         viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - 0.01);
+                     }
+                     completion:^(BOOL finished) {
+                         [UIView animateWithDuration:0.3
+                                               delay:0.0
+                                             options:UIViewAnimationOptionCurveEaseOut
+                                          animations:^{
+                                              viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI - M_PI*footstepValue/10);
+                                          }
+                                          completion:^(BOOL finished) {
+                                            
+                                          }
+                          ];
+                     }
+     ];
 }
 
 - (void)bumpView:(UIView *)viewToRotate {
-    [UIView animateWithDuration:0.5
+    [UIView animateWithDuration:0.3
                           delay:0.0
-                        options:UIViewAnimationOptionAutoreverse
+                        options:UIViewAnimationOptionCurveEaseInOut
                      animations:^{
                          viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(M_PI*0.2);
                      }
                      completion:^(BOOL finished) {
-                         viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(0);
+                         [UIView animateWithDuration:0.3
+                                               delay:0.0
+                                             options:UIViewAnimationOptionCurveEaseInOut
+                                          animations:^{
+                                              viewToRotate.layer.affineTransform = CGAffineTransformMakeRotation(0);
+                                          }
+                                          completion:^(BOOL finished) {
+                                              
+                                          }
+                          ];
                      }
      ];
 }
